@@ -1,7 +1,8 @@
 /* ================================================================
- *  CineFreak  ->  Nuvio provider  (v1.1)
+ *  CineFreak  ->  Nuvio provider  (v1.2 - Hermes compatible)
  *  TMDB(meta) -> cinefreak search -> post page -> cinecloud /f/<id>
  *  --POST a=play--> direct file URL
+ *  NOTE: No async/await (Hermes safe). Promise chain only.
  * ================================================================ */
 
 var CF_BASE = "https://cinefreak.net";
@@ -10,20 +11,30 @@ var TMDB_KEY = "439c478a771f35c05022f9feabcca01c"; // নিজের key বস
 
 function req(url, o) {
   o = o || {};
-  var h = { "User-Agent": UA, "Accept": o.accept || "text/html,application/json,*/*",
-            "Accept-Language": "en-US,en;q=0.9" };
+  var h = {
+    "User-Agent": UA,
+    "Accept": o.accept || "text/html,application/json,*/*",
+    "Accept-Language": "en-US,en;q=0.9"
+  };
   if (o.referer) h["Referer"] = o.referer;
   if (o.headers) for (var k in o.headers) h[k] = o.headers[k];
   var opt = { method: o.method || "GET", headers: h };
   if (o.body) opt.body = o.body;
   return fetch(url, opt).then(function (r) { return r.text(); });
 }
+
 function asJson(t) { try { return JSON.parse(t); } catch (e) { return null; } }
 function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+
 function stripTags(x) {
-  return x.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ")
-          .replace(/&#0?39;/g, "'").replace(/\s+/g, " ").trim();
+  return x.replace(/<[^>]+>/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&#0?39;/g, "'")
+          .replace(/\s+/g, " ")
+          .trim();
 }
+
 function first(re, s, i) { var m = re.exec(s); return m ? (m[i || 1] || "") : ""; }
 
 /* ---------- 1. TMDB meta ---------- */
@@ -33,8 +44,10 @@ function getMeta(tmdbId, mediaType) {
     .then(asJson)
     .then(function (j) {
       j = j || {};
-      return { title: j.title || j.name || j.original_title || j.original_name || "",
-               year: String(j.release_date || j.first_air_date || "").slice(0, 4) };
+      return {
+        title: j.title || j.name || j.original_title || j.original_name || "",
+        year: String(j.release_date || j.first_air_date || "").slice(0, 4)
+      };
     })
     .catch(function () { return { title: "", year: "" }; });
 }
@@ -51,8 +64,11 @@ function findPost(meta, mediaType) {
         var r = rows[i], t = norm(r.t), s = 0;
         if (t.indexOf(want) !== -1) s += 10;
         if (meta.year && String(r.t).indexOf(meta.year) !== -1) s += 6;
-        if (mediaType === "tv") { if (/series|season|episode|k-drama/i.test(r.t)) s += 4; }
-        else { if (/full movie/i.test(r.t)) s += 2; }
+        if (mediaType === "tv") {
+          if (/series|season|episode|k-drama/i.test(r.t)) s += 4;
+        } else {
+          if (/full movie/i.test(r.t)) s += 2;
+        }
         if (/full-(movie|series)-download/.test(String(r.l))) s += 2;
         s -= i * 0.1;
         if (s > bestScore) { bestScore = s; best = r; }
@@ -104,16 +120,24 @@ function scrapePost(postUrl, mediaType, season, episode) {
       var quality = pickQuality(label);
       var size = first(/\b(\d+(?:\.\d+)?\s?(?:MB|GB|TB))\b/i, label) || "";
       var codec = /hevc|x265|10bit|10-bit/i.test(label) ? "HEVC" : "";
-      var epNum = parseInt(first(/\bEP\s*0*(\d{1,4})\b/i, label) ||
-                           first(/\bEpisode\s*0*(\d{1,4})/i, label) || "0", 10);
+      var epNum = parseInt(
+        first(/\bEP\s*0*(\d{1,4})\b/i, label) ||
+        first(/\bEpisode\s*0*(\d{1,4})/i, label) || "0",
+        10
+      );
 
       var bits = [quality];
       if (codec) bits.push(codec);
       if (size) bits.push(size);
       if (epNum) bits.push("EP " + epNum);
 
-      items.push({ href: links[i].href, title: bits.join(" • "),
-                   quality: quality, ep: epNum, key: quality + "|" + size + "|" + epNum });
+      items.push({
+        href: links[i].href,
+        title: bits.join(" • "),
+        quality: quality,
+        ep: epNum,
+        key: quality + "|" + size + "|" + epNum
+      });
     }
 
     if (mediaType === "tv" && episode) {
@@ -133,21 +157,33 @@ function scrapePost(postUrl, mediaType, season, episode) {
   });
 }
 
-/* ---------- 4. cinecloud -> ডিরেক্ট URL ---------- */
+/* ---------- 4. cinecloud -> ডিরেক্ট URL (Hermes safe) ---------- */
 function resolveCinecloud(pageUrl) {
   return req(pageUrl, { referer: CF_BASE + "/" }).then(function (html) {
     var csrf = first(/name="X-CSRF-TOKEN"\s+content="([^"]+)"/i, html);
-    var body = "a=play" + (csrf ? "&X-CSRF-TOKEN=" + encodeURIComponent(csrf) : "");
+
+    var headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest"
+    };
+    // CSRF টোকেন header এ পাঠানো হচ্ছে (আগে body তে ছিল)
+    if (csrf) headers["X-CSRF-TOKEN"] = csrf;
+
     return req(pageUrl, {
-      method: "POST", body: body, referer: pageUrl,
-      headers: { "Content-Type": "application/x-www-form-urlencoded",
-                 "X-Requested-With": "XMLHttpRequest" }
+      method: "POST",
+      body: "a=play",
+      referer: pageUrl,
+      headers: headers
     });
   }).then(function (txt) {
+    try { console.log("[CineFreak] play response:", String(txt).slice(0, 300)); } catch (e) {}
     var j = asJson(txt);
-    if (j && j.ok) {
+    if (j) {
       if (j.vlc) return j.vlc;
       if (j.url) return j.url;
+      if (j.data && j.data.url) return j.data.url;
+      if (j.link) return j.link;
+      if (j.file) return j.file;
     }
     return pageUrl;
   }).catch(function () { return pageUrl; });
@@ -165,13 +201,28 @@ function getStreams(tmdbId, mediaType, season, episode) {
       if (!items.length) return [];
       return Promise.all(items.map(function (it) {
         return resolveCinecloud(it.href).then(function (url) {
-          return { name: "CineFreak", title: it.title, url: url, quality: it.quality,
-                   headers: { "User-Agent": UA, "Referer": CF_BASE + "/" } };
+          // Referer ডাইনামিক: ভিডিও হোস্টের ডোমেইন ব্যবহার করা ভালো
+          var ref = CF_BASE + "/";
+          var hostMatch = /^https?:\/\/([^\/]+)/i.exec(url);
+          if (hostMatch && /cinecloud\.site/i.test(hostMatch[1])) {
+            ref = "https://" + hostMatch[1] + "/";
+          }
+          return {
+            name: "CineFreak",
+            title: it.title,
+            url: url,
+            quality: it.quality,
+            headers: { "User-Agent": UA, "Referer": ref }
+          };
         });
       }));
     })
-    .catch(function (e) { try { console.log("[CineFreak] " + e); } catch (x) {} return []; });
+    .catch(function (e) {
+      try { console.log("[CineFreak] error: " + e); } catch (x) {}
+      return [];
+    });
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { getStreams: getStreams };
-      
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { getStreams: getStreams };
+        }
