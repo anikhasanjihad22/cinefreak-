@@ -1,0 +1,22 @@
+{
+  "name": "CineFreak Repo",
+  "version": "1.0.0",
+  "scrapers": [
+    {
+      "id": "cinefreak-net",
+      "name": "CineFreak",
+      "description": "Direct CineCloud streams from cinefreak.net (Hindi / Bangla / Dual-Audio / Web-Series).",
+      "version": "1.0.0",
+      "author": "anikhasanjihad22",
+      "supportedTypes": ["movie", "tv"],
+      "filename": "providers/cinefreak.js",
+      "enabled": true,
+      "logo": "https://www.google.com/s2/favicons?domain=cinefreak.net&sz=128",
+      "contentLanguage": ["en", "hi", "bn"],
+      "formats": ["mkv", "mp4"],
+      "limited": false,
+      "disabledPlatforms": [],
+      "supportsExternalPlayer": true
+    }
+  ]
+}
