@@ -84,7 +84,8 @@ function collectWatch(html) {
     var tag = m[0];
     var href = first(/href="([^"]+)"/, tag) || "";
     var cls = first(/class="([^"]+)"/, tag) || "";
-    if (href.indexOf("cinecloud.site/f/") === -1) continue;
+    // CineFreak rotates CineCloud across hosts such as new5.cinecloud.site.
+    if (!/^https?:\/\/(?:[a-z0-9-]+\.)*cinecloud\.site\/f\//i.test(href)) continue;
     if (!/watch/i.test(cls) || /download/i.test(cls)) continue;
     out.push({ href: href, at: m.index });
   }
@@ -173,3 +174,4 @@ function getStreams(tmdbId, mediaType, season, episode) {
 }
 
 if (typeof module !== "undefined" && module.exports) module.exports = { getStreams: getStreams };
+      
