@@ -5,7 +5,7 @@
     {
       "id": "cinefreak-net",
       "name": "CineFreak",
-      "description": "Direct CineCloud streams from cinefreak.net (Hindi / Bangla / Dual-Audio / Web-Series).",
+      "description": "Direct CineCloud streams from cinefreak.net.",
       "version": "1.0.0",
       "author": "anikhasanjihad22",
       "supportedTypes": ["movie", "tv"],
