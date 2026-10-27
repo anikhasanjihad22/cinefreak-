@@ -1,0 +1,18 @@
+[
+  {
+    "id": "cinefreak-net",
+    "name": "CineFreak",
+    "description": "Direct CineCloud streams from cinefreak.net (Hindi/Bangla/Dual-Audio/Web-Series).",
+    "version": "1.0.0",
+    "author": "you",
+    "supportedTypes": ["movie", "tv"],
+    "filename": "providers/cinefreak.js",
+    "enabled": false,
+    "logo": "https://cinefreak.net/wp-content/uploads/2024/08/crop-cgk-192x192.png",
+    "contentLanguage": ["en", "hi", "bn"],
+    "formats": ["mkv", "mp4"],
+    "limited": false,
+    "disabledPlatforms": [],
+    "supportsExternalPlayer": true
+  }
+]
